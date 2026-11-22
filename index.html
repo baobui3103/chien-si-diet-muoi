@@ -4,7 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Chiến sĩ nhí diệt muỗi</title>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Font tải không chặn trang: mạng yếu thì trang vẫn hiện ngay bằng font hệ thống -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet"></noscript>
 
     <!-- =====================================================================
          CẤU HÌNH NHẠC NỀN  (sửa ngay tại đây)
@@ -30,6 +34,19 @@
 
         // Vị trí khung ghi phép tính trên ảnh con muỗi (tính theo % của ảnh 360x360)
         const LABEL_BOX = { left: 25, top: 54.2, width: 57.8, height: 22.8 };
+
+        // ===== Tải trước ảnh ngay khi mở trang: nút BẮT ĐẦU chỉ bật khi ảnh con muỗi đã sẵn sàng =====
+        const PRELOAD_MAX_WAIT_MS = 10000;   // mạng quá yếu: chờ tối đa bấy nhiêu mili giây rồi vẫn cho chơi
+        const preloaded = [];                // giữ tham chiếu để trình duyệt không bỏ ảnh đã tải
+        const preloadImg = src => new Promise(resolve => {
+            if (!src) return resolve();
+            const im = new Image(); preloaded.push(im);
+            im.onload = () => { (im.decode ? im.decode() : Promise.resolve()).catch(() => {}).then(resolve); };
+            im.onerror = resolve;            // thiếu file ảnh: game vẫn chạy bằng hình muỗi vẽ tạm
+            im.src = src;
+        });
+        preloadImg(START_IMG);               // ảnh màn hình bắt đầu: tải song song, không bắt chờ
+        const assetsReady = Promise.race([preloadImg(MOSQUITO_IMG), new Promise(r => setTimeout(r, PRELOAD_MAX_WAIT_MS))]);
     </script>
 
     <style>
@@ -144,6 +161,7 @@
             padding: .25em 1.4em; font-size: clamp(18px, 2.5vw, 32px); border: 3px solid #fff; line-height: 1.25;
             animation: btnPulse 1.6s ease-in-out infinite;
         }
+        .btn.start-btn:disabled { background: #94a3b8; box-shadow: 0 6px 0 #64748b; cursor: wait; animation: none; }
         .btn.start-btn:active { animation: none; transform: translateX(-50%) translateY(4px); }
 
         .btn {
@@ -365,7 +383,9 @@
     }
 
     // ===================== Luồng game =====================
+    let assetsDone = false;
     function startGame() {
+        if (!assetsDone) return;   // ảnh con muỗi chưa tải xong
         gameId++;
         $('startScreen').classList.remove('show');
         $('endScreen').classList.remove('show');
@@ -523,6 +543,11 @@
 
     // ===================== Khởi tạo =====================
     if (!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)) $('fsBtn').style.display = 'none';   // trình duyệt không hỗ trợ (ví dụ iPhone)
+    (function () {   // nút BẮT ĐẦU chờ ảnh tải xong
+        const btn = document.querySelector('.start-btn');
+        btn.disabled = true; btn.textContent = 'ĐANG TẢI...';
+        assetsReady.then(() => { assetsDone = true; btn.disabled = false; btn.textContent = 'BẮT ĐẦU'; });
+    })();
     $('targetNum').textContent = TARGET;
     $('startImg').src = START_IMG;
     for (let i = 0; i < 4; i++) {   // vài đám mây trang trí
